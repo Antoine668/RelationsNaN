@@ -77,12 +77,25 @@ namespace RelationsNaN.Controllers
                 return NotFound();
             }
 
-            var game = await _context.Game.FindAsync(id);
+            var game = await _context.Game.Include(g => g.Platforms).FirstOrDefaultAsync(g => id == g.Id);
             if (game == null)
             {
                 return NotFound();
             }
-            ViewData["GenreId"] = new SelectList(_context.Genre, "Name", "Name", game.GenreId);
+            ViewData["GenreId"] = new SelectList(_context.Genre, "Id", "Name", game.GenreId);
+
+            // Logique pour créer une liste qui contien les plateformes que le jeu n'a pas déjà
+            List<Platform> platformNonAssocie = _context.Platform.ToList();
+            foreach (var platform in game.Platforms)
+            {
+                if (platformNonAssocie.Contains(platform))
+                {
+                    platformNonAssocie.Remove(platform);
+                }
+            }
+
+            ViewBag.Platforms = new SelectList(platformNonAssocie, "Id", "Name", null);
+
             return View(game);
         }
 
@@ -118,7 +131,17 @@ namespace RelationsNaN.Controllers
                 }
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["GenreId"] = new SelectList(_context.Genre, "Name", "Name", game.GenreId);
+            ViewData["GenreId"] = new SelectList(_context.Genre, "Id", "Name", game.GenreId);
+
+            List<Platform> platformNonAssocie = _context.Platform.ToList();
+            foreach (var platform in game.Platforms)
+            {
+                if (platformNonAssocie.Contains(platform))
+                {
+                    platformNonAssocie.Remove(platform);
+                }
+            }
+            ViewBag.Platforms = new SelectList(platformNonAssocie, "Id", "Name", null);
             return View(game);
         }
 
@@ -159,6 +182,42 @@ namespace RelationsNaN.Controllers
         private bool GameExists(int id)
         {
             return _context.Game.Any(e => e.Id == id);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AddPlatform(int id, int platformId)
+        {
+            var game = await _context.Game.Include(g => g.Platforms).FirstOrDefaultAsync(x => x.Id == id);
+
+            var platform = await _context.Platform.FindAsync(platformId);
+
+            if(game != null && platform != null)
+            {
+                game.Platforms.Add(platform);
+                _context.Game.Update(game);
+            }
+
+            await _context.SaveChangesAsync();
+            return RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RemovePlatform(int id, int platformId)
+        {
+            var game = await _context.Game.Include(g => g.Platforms).FirstOrDefaultAsync(x => x.Id == id);
+
+            var platform = await _context.Platform.FindAsync(platformId);
+
+            if(game != null && platform != null)
+            {
+                game.Platforms.Remove(platform);
+                _context.Game.Update(game);
+            }
+
+            await _context.SaveChangesAsync();
+            return RedirectToAction(nameof(Index));
         }
     }
 }
